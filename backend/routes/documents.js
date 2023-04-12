@@ -58,7 +58,10 @@ router.post('/add', function (req, res, next) {
                     res.status(500).send('Error creating user-document connection');
                     return;
                 }
-
+                if (userDocumentResult.affectedRows === 0) {
+                    res.status(500).send('Error creating user-document connection');
+                    return;
+                }
                 res.status(200).send({ message: 'Document added successfully', documentId: documentId });
             });
         });
@@ -94,8 +97,6 @@ router.get('/:userId', function (req, res, next) {
 });
 
 router.delete('/delete/:userId/:documentId', function (req, res, next) {
-    // 
-
     const documentId = req.params.documentId;
     const userId = req.params.userId;
 
@@ -136,6 +137,30 @@ router.delete('/delete/:userId/:documentId', function (req, res, next) {
             res.status(200).send({ message: 'Document deleted' });
         });
     });
+});
+
+router.put('/update/', function (req, res, next) {
+    const documentId = req.body.id;
+    const content = req.body.content;
+
+    if (!documentId || !content) {
+        res.status(400).send('Bad Request');
+        return;
+    }
+    const sql = `
+        UPDATE documents
+        SET content = ?
+        WHERE id = ?
+    `;
+    req.app.locals.db.query(sql, [content, documentId], function (err, result) {
+        if (err) {
+            console.log('Error updating document');
+            res.status(500).send('Internal Server Error');
+            return;
+        }
+        res.status(200).send({ message: 'Document updated' });
+    }
+    );
 });
 
 module.exports = router;
