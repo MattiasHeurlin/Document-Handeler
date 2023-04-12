@@ -19,10 +19,10 @@ router.get('/', function (req, res, next) {
 
 router.post('/add', function (req, res, next) {
     const title = req.body.title;
-    const content = req.body.content;
     const userId = req.body.userId;
+    const content = "";
     const documentId = uuid.v4();
-    if (!title || !content || !userId) {
+    if (!title || !userId) {
         res.status(400).send({ message: 'Bad Request' });
         return;
     }
@@ -62,7 +62,7 @@ router.post('/add', function (req, res, next) {
                     res.status(500).send('Error creating user-document connection');
                     return;
                 }
-                res.status(200).send({ message: 'Document added successfully', documentId: documentId });
+                res.status(201).send({ message: 'Document added successfully', documentId: documentId });
             });
         });
     });
@@ -94,6 +94,28 @@ router.get('/:userId', function (req, res, next) {
         }
         res.status(200).send(result);
     });
+});
+
+router.get('/one/:documentId', function (req, res, next) {
+    const documentId = req.params.documentId;
+    if (!documentId) {
+        res.status(400).send('Bad Request');
+        return;
+    }
+    const sql = 'SELECT * FROM documents WHERE id = ?';
+    req.app.locals.db.query(sql, [documentId], function (err, result) {
+        if (err) {
+            console.log('Error getting document');
+            res.status(500).send({ message: 'Error getting document' });
+            return;
+        }
+        if (result.length === 0) {
+            res.status(404).send({ message: 'Document not found' });
+            return;
+        }
+        res.status(200).send(result[0]);
+    }
+    );
 });
 
 router.delete('/delete/:userId/:documentId', function (req, res, next) {

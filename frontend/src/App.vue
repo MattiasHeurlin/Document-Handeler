@@ -3,9 +3,11 @@ import loginPage from "./components/loginPage.vue";
 import documentsList from "./components/documentsList.vue";
 import { useEditor, EditorContent } from "@tiptap/vue-3";
 import StarterKit from "@tiptap/starter-kit";
-import { defineComponent, reactive, ref } from "vue";
+import { defineComponent, reactive, ref, computed } from "vue";
 import Document from "@tiptap/extension-document";
 import { Color } from "@tiptap/extension-color";
+import TextStyle from "@tiptap/extension-text-style";
+
 export default defineComponent({
   name: "Document Manger",
   components: {
@@ -19,10 +21,19 @@ export default defineComponent({
       loginPage: true,
       openDocument: false,
       actionSucess: false,
+      isEditable: false,
+      updateKey: 0,
+      areUSure: false,
+      creatingNewDocument: false,
     });
     const userInfo = reactive({
       name: "",
       id: "",
+    });
+
+    const newDocument = reactive({
+      title: "",
+      userId: userInfo.id,
     });
 
     function successfulLogin(user) {
@@ -33,12 +44,14 @@ export default defineComponent({
     function updateSelectedDoc(document) {
       currentlySelectedDocument.value = document;
       state.openDocument = true;
+      state.creatingNewDocument = false;
+      state.isEditable = false;
+      editor.value.setEditable(false);
       updateContent();
     }
 
     const editor = useEditor({
-      content: "placeholder",
-      extensions: [StarterKit, Color],
+      extensions: [StarterKit, Color, TextStyle, Document],
     });
     function updateContent() {
       editor.value.commands.setContent(currentlySelectedDocument.value.content);
@@ -83,8 +96,10 @@ export default defineComponent({
       })
         .then((response) => {
           if (response.status === 200) {
-            state.actionSucess = true;
+            currentlySelectedDocument.value = {};
             state.openDocument = false;
+            state.areUSure = false;
+            state.updateKey += 1;
             console.log("Deleted");
           }
           return response.json();
@@ -94,9 +109,79 @@ export default defineComponent({
             console.log(data.error);
           }
         });
-      setTimeout(() => {
-        state.actionSucess = false;
-      }, 2000);
+    }
+
+    const currentColor = computed(() => {
+      const textStyle = editor.value.getAttributes("textStyle");
+      return textStyle.color || "#000000";
+    });
+
+    function toggleEditable() {
+      if (state.isEditable) {
+        state.isEditable = false;
+        editor.value.setEditable(false);
+      } else {
+        state.isEditable = true;
+        editor.value.setEditable(true);
+      }
+    }
+
+    function toggleCreateNewDocument() {
+      if (state.creatingNewDocument) {
+        state.creatingNewDocument = false;
+        state.openDocument = true;
+      } else {
+        state.creatingNewDocument = true;
+        state.openDocument = false;
+      }
+    }
+
+    function createNewDocument() {
+      const data = {
+        title: newDocument.title,
+        userId: userInfo.id,
+      };
+      console.log(data);
+      fetch("http://localhost:3000/documents/add", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      })
+        .then((response) => {
+          if (response.status === 201) {
+            console.log(Document + "Created");
+          }
+          return response.json();
+        })
+        .then(async (data) => {
+          if (data.error) {
+            console.log(data.error);
+          }
+          try {
+            console.log(data);
+            const doc = await getDocById(data.documentId);
+            currentlySelectedDocument.value = doc;
+            state.isEditable = true;
+            editor.value.setEditable(true);
+            toggleCreateNewDocument();
+          } catch (error) {
+            console.log(error);
+          }
+        });
+    }
+
+    async function getDocById(id) {
+      const response = await fetch("http://localhost:3000/documents/one/" + id);
+      if (response.status === 200) {
+        console.log("Got document");
+      }
+      const data = await response.json();
+      if (data.error) {
+        console.log(data.error);
+      }
+      return data;
     }
 
     return {
@@ -109,6 +194,11 @@ export default defineComponent({
       updateContent,
       saveDocument,
       deleteDocument,
+      currentColor,
+      toggleEditable,
+      newDocument,
+      toggleCreateNewDocument,
+      createNewDocument,
     };
   },
 });
@@ -128,96 +218,64 @@ export default defineComponent({
         <documentsList
           @updateSelectedContent="updateSelectedDoc"
           :userId="userInfo.id"
+          :key="state.updateKey"
         />
       </article>
       <article class="mainContent">
-        <h2 class="text-2xl m-4 text-accent">
-          Hantera Dokument -
-          <span class="text-info">{{ currentlySelectedDocument.title }}</span>
-        </h2>
+        <header class="flex justify-between h-12 m-4">
+          <h2 class="text-3xl text-accent">
+            Hantera Dokument -
+            <span class="text-info">{{ currentlySelectedDocument.title }}</span>
+          </h2>
+          <button @click="toggleCreateNewDocument" class="btn btn-success mr-4">
+            Skapa Nytt Dokument
+          </button>
+        </header>
+        <div
+          v-if="state.creatingNewDocument"
+          class="newDocContainer text-info text-xl"
+        >
+          <h4>Skapa Nytt Dokument</h4>
+          <div class="flex gap-4 justify-center content-center">
+            <input
+              v-model="newDocument.title"
+              aria-label="titel till dokument"
+              placeholder="Titel"
+              class="input input-bordered input-info w-full max-w-xs"
+              type="text"
+              name="title"
+              id="title"
+            />
+          </div>
+          <div>
+            <button @click="createNewDocument" class="btn btn-success w-2/3">
+              Skapa
+            </button>
+            <button
+              @click="toggleCreateNewDocument"
+              class="btn btn-error w-1/3"
+            >
+              Avbryt
+            </button>
+          </div>
+          <p class="text-neutral text-base">
+            Spara eventuellt öppet dokument innan.
+          </p>
+        </div>
         <div v-if="state.openDocument" class="flex">
           <div class="editorContainer">
             <editor-content :editor="editor" />
-            <div v-if="editor" class="editorOptions">
+            <div v-if="state.isEditable" class="editorOptions">
               <input
                 type="color"
                 @input="
                   editor.chain().focus().setColor($event.target.value).run()
                 "
-                :value="editor.getAttributes('color').color"
+                :value="currentColor"
               />
-              <button
-                @click="editor.chain().focus().setColor('#958DF1').run()"
-                :class="{
-                  'is-active': editor.isActive('color', {
-                    color: '#958DF1',
-                  }),
-                }"
-              >
-                purple
-              </button>
-              <button
-                @click="editor.chain().focus().setColor('#F98181').run()"
-                :class="{
-                  'is-active': editor.isActive('color', {
-                    color: '#F98181',
-                  }),
-                }"
-              >
-                red
-              </button>
-              <button
-                @click="editor.chain().focus().setColor('#FBBC88').run()"
-                :class="{
-                  'is-active': editor.isActive('color', {
-                    color: '#FBBC88',
-                  }),
-                }"
-              >
-                orange
-              </button>
-              <button
-                @click="editor.chain().focus().setColor('#FAF594').run()"
-                :class="{
-                  'is-active': editor.isActive('color', {
-                    color: '#FAF594',
-                  }),
-                }"
-              >
-                yellow
-              </button>
-              <button
-                @click="editor.chain().focus().setColor('#70CFF8').run()"
-                :class="{
-                  'is-active': editor.isActive('color', {
-                    color: '#70CFF8',
-                  }),
-                }"
-              >
-                blue
-              </button>
-              <button
-                @click="editor.chain().focus().setColor('#94FADB').run()"
-                :class="{
-                  'is-active': editor.isActive('color', {
-                    color: '#94FADB',
-                  }),
-                }"
-              >
-                teal
-              </button>
-              <button
-                @click="editor.chain().focus().setColor('#B9F18D').run()"
-                :class="{
-                  'is-active': editor.isActive('color', {
-                    color: '#B9F18D',
-                  }),
-                }"
-              >
-                green
-              </button>
+             
               <button @click="editor.chain().focus().unsetColor().run()">
-                unsetColor
+                Ta Bort Färg
               </button>
 
               <button
@@ -225,40 +283,40 @@ export default defineComponent({
                 :disabled="!editor.can().chain().focus().toggleBold().run()"
                 :class="{ 'is-active': editor.isActive('bold') }"
               >
-                bold
+                Bold
               </button>
               <button
                 @click="editor.chain().focus().toggleItalic().run()"
                 :disabled="!editor.can().chain().focus().toggleItalic().run()"
                 :class="{ 'is-active': editor.isActive('italic') }"
               >
-                italic
+                Italic
               </button>
               <button
                 @click="editor.chain().focus().toggleStrike().run()"
                 :disabled="!editor.can().chain().focus().toggleStrike().run()"
                 :class="{ 'is-active': editor.isActive('strike') }"
               >
-                strike
+                Stykning
               </button>
               <button
                 @click="editor.chain().focus().toggleCode().run()"
                 :disabled="!editor.can().chain().focus().toggleCode().run()"
                 :class="{ 'is-active': editor.isActive('code') }"
               >
-                code
+                Kod
               </button>
               <button @click="editor.chain().focus().unsetAllMarks().run()">
-                clear marks
+                Rensa Markeringar
               </button>
               <button @click="editor.chain().focus().clearNodes().run()">
-                clear nodes
+                Rensa Nodes
               </button>
               <button
                 @click="editor.chain().focus().setParagraph().run()"
                 :class="{ 'is-active': editor.isActive('paragraph') }"
               >
-                paragraph
+                Paragraph
               </button>
               <button
                 @click="
@@ -268,7 +326,7 @@ export default defineComponent({
                   'is-active': editor.isActive('heading', { level: 1 }),
                 }"
               >
-                h1
+                H1
               </button>
               <button
                 @click="
@@ -278,7 +336,7 @@ export default defineComponent({
                   'is-active': editor.isActive('heading', { level: 2 }),
                 }"
               >
-                h2
+                H2
               </button>
               <button
                 @click="
@@ -288,7 +346,7 @@ export default defineComponent({
                   'is-active': editor.isActive('heading', { level: 3 }),
                 }"
               >
-                h3
+                H3
               </button>
               <button
                 @click="
@@ -298,7 +356,7 @@ export default defineComponent({
                   'is-active': editor.isActive('heading', { level: 4 }),
                 }"
               >
-                h4
+                H4
               </button>
               <button
                 @click="
@@ -318,57 +376,78 @@ export default defineComponent({
                   'is-active': editor.isActive('heading', { level: 6 }),
                 }"
               >
-                h6
+                H6
               </button>
               <button
                 @click="editor.chain().focus().toggleBulletList().run()"
                 :class="{ 'is-active': editor.isActive('bulletList') }"
               >
-                bullet list
+                Punkt Lista
               </button>
               <button
                 @click="editor.chain().focus().toggleOrderedList().run()"
                 :class="{ 'is-active': editor.isActive('orderedList') }"
               >
-                ordered list
+                Numrerad Lista
               </button>
               <button
                 @click="editor.chain().focus().toggleCodeBlock().run()"
                 :class="{ 'is-active': editor.isActive('codeBlock') }"
               >
-                code block
+                Kodblock
               </button>
               <button
                 @click="editor.chain().focus().toggleBlockquote().run()"
                 :class="{ 'is-active': editor.isActive('blockquote') }"
               >
-                blockquote
+                Blockquote
               </button>
               <button @click="editor.chain().focus().setHorizontalRule().run()">
-                horizontal rule
+                Horisontell linje
               </button>
               <button @click="editor.chain().focus().setHardBreak().run()">
-                hard break
+                Radbrytning
               </button>
               <button
                 @click="editor.chain().focus().undo().run()"
                 :disabled="!editor.can().chain().focus().undo().run()"
               >
-                undo
+                Ångra
               </button>
               <button
                 @click="editor.chain().focus().redo().run()"
                 :disabled="!editor.can().chain().focus().redo().run()"
               >
-                redo
+                Gör Om
               </button>
             </div>
           </div>
           <div class="flex flex-col gap-2">
+            <button
+              v-if="!state.isEditable"
+              @click="toggleEditable"
+              class="btn btn-info"
+            >
+              Redigera
+            </button>
+            <button v-else class="btn btn-info" @click="toggleEditable">
+              Sluta Redigera
+            </button>
             <button class="btn btn-success" @click="saveDocument">Spara</button>
-            <button class="btn btn-error" @click="deleteDocument">
+            <button v-if="!state.areUSure" class="btn btn-error" @click="state.areUSure = true">
               Radera
             </button>
+            <div class="text-center" v-if="state.areUSure">
+              <p class="m-2 text-info"><span class="text-error">RADERA:</span>  <br> Är Du Säker?</p>
+              <div>
+                <button class="btn btn-info" @click="state.areUSure = false">
+                  Nej
+                </button>
+                <button class="btn btn-error" @click="deleteDocument">
+                  Ja
+                </button>
+              </div>
+            </div>
             <div
               v-if="state.actionSucess"
               class="alert alert-success shadow-lg"
@@ -443,11 +522,33 @@ main {
 
 .editorOptions button {
   margin: 5px;
-  padding: 5px;
+  padding: 10px;
   border: none;
   background-color: #002b49;
   color: #fff;
-  border-radius: 5px;
+  border-radius: 30px;
   cursor: pointer;
 }
+
+.editorOptions button:hover {
+  background-color: #00528d;
+  color: #fff;
+}
+
+.is-active {
+  background-color: #3074a5;
+  color: #fff;
+}
+.newDocContainer {
+  width: 30%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  text-align: center;
+  gap: 10px;
+  background-color: #223e6059;
+  padding: 30px;
+}
+
+
 </style>

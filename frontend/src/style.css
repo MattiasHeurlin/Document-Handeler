@@ -2,8 +2,49 @@
 @tailwind components;
 @tailwind utilities;
 
+h2 {
+  font-size: 2rem;
+  font-weight: bold;
+  margin: 1rem 0;
+}
 
+h3 {
+  font-size: 1.75rem;
+  font-weight: bold;
+  margin: 1rem 0;
+}
 
+h4 {
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin: 1rem 0;
+}
+
+h5 {
+  font-size: 1.25rem;
+  font-weight: bold;
+  margin: 1rem 0;
+}
+
+h6 {
+  font-size: 1rem;
+  font-weight: bold;
+  margin: 1rem 0;
+}
+
+ul, ol {
+  margin: 0;
+  padding: 0;
+  list-style-position: inside;
+}
+
+ul {
+  list-style-type: disc;
+}
+
+ol {
+  list-style-type: decimal;
+}
 /*! normalize.css v8.0.1 | MIT License | github.com/necolas/normalize.css */
 
 /* Document

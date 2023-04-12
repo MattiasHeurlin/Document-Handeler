@@ -7,6 +7,7 @@ export default defineComponent({
     userId: String,
   },
   setup(props, { emit }) {
+    
     const userDocuments = ref([] as Document[]);
     function updateSelectedDocument(document: Document) {
       emit("updateSelectedContent", document);
@@ -41,10 +42,13 @@ export default defineComponent({
 
 <template>
 
-<ul v-if="userDocuments.length > 0" class="flex flex-col justify-evenly">
+
+
+<ul v-if="userDocuments.length > 0" class="flex flex-col m-2 gap-2 justify-evenly overflow-y-auto">
   <li @click="updateSelectedDocument(document)" v-for="document in userDocuments" :key="document.id">
     {{ document.title }}
   </li>
+
 </ul>
 
 </template>
@@ -53,11 +57,16 @@ export default defineComponent({
   li {
     list-style: none;
     border: 1px solid black;
-    padding: 1.1rem;
-    margin: 1rem;
-    color: rgb(223, 246, 255);
+    padding: 10px;
+    color: rgb(4, 249, 192);
     background-color: #1f2937;
     font-size: 1.2rem;
     max-width: 400px;
   }
+  li:hover {
+    background-color: #1b4588;
+    cursor: pointer;
+  }
+
+  
 </style>
