@@ -81,7 +81,7 @@ export default defineComponent({
         return;
       }
       try {
-        const response = await fetch("http://localhost:3000/api/users/add", {
+        const response = await fetch("http://localhost:3000/users/add", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -219,17 +219,7 @@ export default defineComponent({
             />
           </label>
 
-          <label class="text-accent" for="name"
-            >E-post:
-            <input
-              type="text"
-            
-              name="username"
-              placeholder="Användarnamn"
-              v-model="newUser.name"
-              class="input input-bordered input-info w-full max-w-xs"
-            />
-          </label>
+        
           <label class="text-accent" for="password"
             >Lösenord:
             <input

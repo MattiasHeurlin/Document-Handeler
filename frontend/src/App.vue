@@ -3,10 +3,11 @@ import loginPage from "./components/loginPage.vue";
 import documentsList from "./components/documentsList.vue";
 import { useEditor, EditorContent } from "@tiptap/vue-3";
 import StarterKit from "@tiptap/starter-kit";
-import { defineComponent, reactive, ref, computed } from "vue";
+import { defineComponent, reactive, ref, computed, watch } from "vue";
 import Document from "@tiptap/extension-document";
 import { Color } from "@tiptap/extension-color";
 import TextStyle from "@tiptap/extension-text-style";
+import { Highlight } from "@tiptap/extension-highlight";
 
 export default defineComponent({
   name: "Document Manger",
@@ -30,6 +31,12 @@ export default defineComponent({
       name: "",
       id: "",
     });
+    const pickedBackgroundColor = ref("#ffffff");
+
+    watch(pickedBackgroundColor, (newValue) => {
+      console.log(newValue)
+      editor.value.chain().focus().setHighlight({color:newValue}).run();
+    });
 
     const newDocument = reactive({
       title: "",
@@ -50,9 +57,22 @@ export default defineComponent({
       updateContent();
     }
 
+ 
+
+    function unsetBackgroundColor() {
+      editor.value.chain().focus().unsetHighlight().run();
+    }
+
     const editor = useEditor({
-      extensions: [StarterKit, Color, TextStyle, Document],
+      extensions: [
+        StarterKit,
+        Color,
+        TextStyle,
+        Document,
+        Highlight.configure({ multicolor: true }),
+      ],
     });
+
     function updateContent() {
       editor.value.commands.setContent(currentlySelectedDocument.value.content);
     }
@@ -75,6 +95,7 @@ export default defineComponent({
           if (response.status === 200) {
             state.actionSucess = true;
             console.log("Saved");
+            state.updateKey += 1;
           }
           return response.json();
         })
@@ -97,10 +118,12 @@ export default defineComponent({
         .then((response) => {
           if (response.status === 200) {
             currentlySelectedDocument.value = {};
+
             state.openDocument = false;
             state.areUSure = false;
             state.updateKey += 1;
             console.log("Deleted");
+            editor.value.commands.clearContent();
           }
           return response.json();
         })
@@ -164,6 +187,8 @@ export default defineComponent({
             const doc = await getDocById(data.documentId);
             currentlySelectedDocument.value = doc;
             state.isEditable = true;
+            state.updateKey += 1;
+            editor.value.commands.clearContent();
             editor.value.setEditable(true);
             toggleCreateNewDocument();
           } catch (error) {
@@ -184,6 +209,18 @@ export default defineComponent({
       return data;
     }
 
+    function logOut() {
+      state.loginPage = true;
+      state.openDocument = false;
+      state.actionSucess = false;
+      state.isEditable = false;
+      state.areUSure = false;
+      state.creatingNewDocument = false;
+      userInfo.name = "";
+      userInfo.id = "";
+      currentlySelectedDocument.value = {};
+    }
+
     return {
       state,
       userInfo,
@@ -199,6 +236,9 @@ export default defineComponent({
       newDocument,
       toggleCreateNewDocument,
       createNewDocument,
+      logOut,
+      pickedBackgroundColor,
+      unsetBackgroundColor,
     };
   },
 });
@@ -208,6 +248,9 @@ export default defineComponent({
     <loginPage @loginSuccess="successfulLogin" />
   </section>
   <main v-else>
+    <button @click="logOut" class="btn btn-primary absolute left-4 top-4">
+      Logga Ut
+    </button>
     <header class="flex flex-col text-2xl text-center w-full">
       <h1>Dokument Hanterare</h1>
       <h2>Välkommen {{ userInfo.name }}</h2>
@@ -273,7 +316,7 @@ export default defineComponent({
                 "
                 :value="currentColor"
               />
-             
+
               <button @click="editor.chain().focus().unsetColor().run()">
                 Ta Bort Färg
               </button>
@@ -309,9 +352,7 @@ export default defineComponent({
               <button @click="editor.chain().focus().unsetAllMarks().run()">
                 Rensa Markeringar
               </button>
-              <button @click="editor.chain().focus().clearNodes().run()">
-                Rensa Nodes
-              </button>
+
               <button
                 @click="editor.chain().focus().setParagraph().run()"
                 :class="{ 'is-active': editor.isActive('paragraph') }"
@@ -420,6 +461,11 @@ export default defineComponent({
               >
                 Gör Om
               </button>
+              <input type="color" v-model="pickedBackgroundColor" />
+
+              <button @click="unsetBackgroundColor()">
+                Ta Bort Bakgrundsfärg
+              </button>
             </div>
           </div>
           <div class="flex flex-col gap-2">
@@ -434,11 +480,18 @@ export default defineComponent({
               Sluta Redigera
             </button>
             <button class="btn btn-success" @click="saveDocument">Spara</button>
-            <button v-if="!state.areUSure" class="btn btn-error" @click="state.areUSure = true">
+            <button
+              v-if="!state.areUSure"
+              class="btn btn-error"
+              @click="state.areUSure = true"
+            >
               Radera
             </button>
             <div class="text-center" v-if="state.areUSure">
-              <p class="m-2 text-info"><span class="text-error">RADERA:</span>  <br> Är Du Säker?</p>
+              <p class="m-2 text-info">
+                <span class="text-error">RADERA:</span> <br />
+                Är Du Säker?
+              </p>
               <div>
                 <button class="btn btn-info" @click="state.areUSure = false">
                   Nej
@@ -549,6 +602,4 @@ main {
   background-color: #223e6059;
   padding: 30px;
 }
-
-
 </style>
